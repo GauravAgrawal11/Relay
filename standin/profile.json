@@ -1,0 +1,38 @@
+{
+  "_comment": "Profile parameters for The Relay stand-in model service. Every value is sourced to a real probe or explicitly marked ASSUMPTION per Hard Rule 1.",
+  "model_name": "openai/gpt-oss-120b",
+  "provenance": {
+    "probe_source_file": "probes/raw_probe_output.json",
+    "probe_date": "2026-11-10",
+    "verified_region": "bom"
+  },
+  "rate_limits": {
+    "requests_per_minute": 1000,
+    "requests_per_minute_source": "probe:x-ratelimit-limit-requests",
+    "tokens_per_minute": 8000,
+    "tokens_per_minute_source": "probe:x-ratelimit-limit-tokens",
+    "reset_tokens_seconds": 3.427,
+    "reset_tokens_source": "probe:x-ratelimit-reset-tokens",
+    "in_flight_concurrency_cap": 5,
+    "in_flight_concurrency_source": "ASSUMPTION: recommended concurrency cap for smooth latency under 8000 TPM",
+    "daily_requests_budget": 14400,
+    "daily_requests_budget_source": "ASSUMPTION: estimated 24h capacity at typical free tier headroom"
+  },
+  "latency_distribution_ms": {
+    "ttft_p50_ms": 2442.4,
+    "ttft_p50_source": "probe:phase2_latency.ttft_p50_ms",
+    "ttft_p90_ms": 4893.4,
+    "ttft_p90_source": "probe:phase2_latency.ttft_p90_ms",
+    "total_p50_ms": 2877.6,
+    "total_p50_source": "probe:phase2_latency.total_p50_ms",
+    "total_p90_ms": 4946.7,
+    "total_p90_source": "probe:phase2_latency.total_p90_ms",
+    "inter_token_delay_ms": 2.5,
+    "inter_token_delay_source": "probe:derived from token streaming output rate",
+    "concurrency_slowdown_factor": 1.25,
+    "concurrency_slowdown_source": "probe:phase3_concurrency wall-clock multiplier",
+    "simulated_failure_rate": 0.03,
+    "simulated_failure_rate_source": "ASSUMPTION: 3% transient network glitch rate for resilience testing"
+  }
+}
+

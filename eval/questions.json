@@ -1,0 +1,278 @@
+[
+  {
+    "question_id": "q01",
+    "question": "What is the model dimensionality d_model and number of attention heads in the base Transformer model in Attention Is All You Need?",
+    "category": "answerable",
+    "target_papers": ["attention"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 5,
+        "section": "s3.2.2",
+        "quote": "In this work we employ h = 8 parallel attention layers, or heads. For each of these we use dk = dv = dmodel/h = 64."
+      }
+    ],
+    "key_facts": ["d_model = 512", "h = 8", "d_k = 64", "d_v = 64"],
+    "must_refuse": false,
+    "expected_answer": "In the base Transformer model, d_model = 512 and the number of attention heads h = 8 (with dk = dv = 64).",
+    "notes": "Direct factual extraction from Section 3.2.2 and Table 3."
+  },
+  {
+    "question_id": "q02",
+    "question": "What BLEU score did the big Transformer achieve on the WMT 2014 English-to-German translation task in Attention Is All You Need?",
+    "category": "answerable",
+    "target_papers": ["attention"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 8,
+        "section": "s5.1",
+        "quote": "On the WMT 2014 English-to-German translation task, the big transformer model (Transformer (big) in Table 2) outperforms the best previously reported models (including ensembles) by more than 2.0 BLEU, establishing a new state-of-the-art BLEU score of 28.4."
+      }
+    ],
+    "key_facts": ["28.4 BLEU", "Table 2", "English-to-German"],
+    "must_refuse": false,
+    "expected_answer": "The big Transformer achieved a BLEU score of 28.4 on the WMT 2014 English-to-German task.",
+    "notes": "Exact numerical result from Table 2 and Section 5.1."
+  },
+  {
+    "question_id": "q03",
+    "question": "What is the frame rate of the Mimi neural audio codec used in Moshi?",
+    "category": "answerable",
+    "target_papers": ["moshi"],
+    "gold_passages": [
+      {
+        "short_tag": "moshi",
+        "page": 8,
+        "section": "s3.3",
+        "quote": "Mimi processes audio sampled at 24 kHz into a sequence of latent representations at 12.5 Hz."
+      }
+    ],
+    "key_facts": ["12.5 Hz", "24 kHz audio"],
+    "must_refuse": false,
+    "expected_answer": "Mimi operates at a frame rate of 12.5 Hz for 24 kHz audio.",
+    "notes": "Key acoustic architecture parameter from Section 3.3."
+  },
+  {
+    "question_id": "q04",
+    "question": "What is the name and parameter count of the text language model backbone incorporated inside Moshi?",
+    "category": "answerable",
+    "target_papers": ["moshi"],
+    "gold_passages": [
+      {
+        "short_tag": "moshi",
+        "page": 7,
+        "section": "s3.2",
+        "quote": "The Helium Text Language Model... Helium is a 7B parameter autoregressive text-only language model."
+      }
+    ],
+    "key_facts": ["Helium", "7B parameters", "autoregressive"],
+    "must_refuse": false,
+    "expected_answer": "The text language model inside Moshi is named Helium, with 7 billion (7B) parameters.",
+    "notes": "Section 3.2 architectural description."
+  },
+  {
+    "question_id": "q05",
+    "question": "Does H-Net in the Dynamic Chunking paper require explicit supervision or heuristic rules to place chunk boundaries?",
+    "category": "answerable",
+    "target_papers": ["dynamic_chunking"],
+    "gold_passages": [
+      {
+        "short_tag": "dynamic_chunking",
+        "page": 1,
+        "section": "sabstract",
+        "quote": "trained jointly with the rest of the network end-to-end without any heuristics or explicit supervision."
+      },
+      {
+        "short_tag": "dynamic_chunking",
+        "page": 4,
+        "section": "s2",
+        "quote": "H-Net learns content- and context-dependent chunking strategies dynamically without rule-based supervision."
+      }
+    ],
+    "key_facts": ["no explicit supervision", "no heuristics", "jointly trained end-to-end"],
+    "must_refuse": false,
+    "expected_answer": "No, H-Net learns dynamic chunk boundaries end-to-end without heuristics or explicit supervision.",
+    "notes": "Core novelty claim of the paper."
+  },
+  {
+    "question_id": "q06",
+    "question": "What is the role of the smoothing module in the Dynamic Chunking architecture of H-Net?",
+    "category": "answerable",
+    "target_papers": ["dynamic_chunking"],
+    "gold_passages": [
+      {
+        "short_tag": "dynamic_chunking",
+        "page": 6,
+        "section": "s2.2.2",
+        "quote": "Smoothing Module... to resolve boundary ambiguity and preserve information across chunk boundaries through weighted convex combination."
+      }
+    ],
+    "key_facts": ["smoothing module", "boundary ambiguity", "convex combination", "upsampler/downsampler alignment"],
+    "must_refuse": false,
+    "expected_answer": "The smoothing module resolves boundary ambiguity and ensures smooth signal propagation across learned chunk transitions.",
+    "notes": "Section 2.2.2 architecture component."
+  },
+  {
+    "question_id": "q07",
+    "question": "What is the overall theoretical latency and practical latency achieved by Moshi for full-duplex spoken dialogue?",
+    "category": "answerable",
+    "target_papers": ["moshi"],
+    "gold_passages": [
+      {
+        "short_tag": "moshi",
+        "page": 1,
+        "section": "sabstract",
+        "quote": "Moshi achieves a theoretical latency of 160ms (200ms frame size with lookahead) and an overall end-to-end latency of ~200ms."
+      }
+    ],
+    "key_facts": ["160ms theoretical latency", "200ms end-to-end practical latency"],
+    "must_refuse": false,
+    "expected_answer": "Moshi achieves a theoretical latency of 160ms and an empirical end-to-end spoken dialogue latency of approximately 200ms.",
+    "notes": "Abstract and Section 1 latency metrics."
+  },
+  {
+    "question_id": "q08",
+    "question": "In Attention Is All You Need, why did the authors divide the dot product by sqrt(d_k) in Scaled Dot-Product Attention?",
+    "category": "answerable",
+    "target_papers": ["attention"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 4,
+        "section": "s3.2.1",
+        "quote": "We suspect that for large values of dk, the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients. To counteract this effect, we scale the dot products by 1 / sqrt(dk)."
+      }
+    ],
+    "key_facts": ["large dot products push softmax into small gradients", "vanished gradients", "divide by sqrt(d_k) to counteract"],
+    "must_refuse": false,
+    "expected_answer": "They scaled by 1/sqrt(d_k) because for large values of d_k, dot products grow large in magnitude, pushing the softmax into regions with vanishingly small gradients.",
+    "notes": "Foundational rationale from Section 3.2.1."
+  },
+  {
+    "question_id": "q09",
+    "question": "What is the maximum context length and training cluster size of Meta's LLaMA 3.1 405B model?",
+    "category": "unanswerable",
+    "target_papers": ["none"],
+    "gold_passages": [],
+    "key_facts": [],
+    "must_refuse": true,
+    "expected_answer": "Refusal: The provided papers (Attention Is All You Need, Moshi, and Dynamic Chunking) do not contain information regarding LLaMA 3.1 405B context length or cluster size.",
+    "notes": "Completely out of scope. System must refuse."
+  },
+  {
+    "question_id": "q10",
+    "question": "How many total kilowatt-hours of electrical energy were consumed to train OpenAI's GPT-4 base model?",
+    "category": "unanswerable",
+    "target_papers": ["none"],
+    "gold_passages": [],
+    "key_facts": [],
+    "must_refuse": true,
+    "expected_answer": "Refusal: The provided papers do not discuss GPT-4 energy consumption.",
+    "notes": "Completely out of scope. System must refuse."
+  },
+  {
+    "question_id": "q11",
+    "question": "What battery capacity in milliampere-hours is installed in the Apple Vision Pro headset?",
+    "category": "unanswerable",
+    "target_papers": ["none"],
+    "gold_passages": [],
+    "key_facts": [],
+    "must_refuse": true,
+    "expected_answer": "Refusal: The papers only cover Attention, Moshi, and Dynamic Chunking; hardware specifications of the Apple Vision Pro are not covered.",
+    "notes": "Completely unrelated subject matter. System must refuse."
+  },
+  {
+    "question_id": "q12",
+    "question": "What word error rate did Moshi achieve on conversational Swedish speech recognition benchmarks?",
+    "category": "unanswerable",
+    "target_papers": ["moshi"],
+    "gold_passages": [],
+    "key_facts": [],
+    "must_refuse": true,
+    "expected_answer": "Refusal: While the Moshi paper discusses speech recognition, it only evaluates English and French dialogue; it does not evaluate Swedish speech.",
+    "notes": "Plausible but absent language evaluation. Must refuse rather than hallucinate."
+  },
+  {
+    "question_id": "q13",
+    "question": "In Table 2 of Attention Is All You Need, what is the training cost in FLOPs listed for the ByteNet baseline on English-to-German translation?",
+    "category": "trap_distractor",
+    "target_papers": ["attention"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 8,
+        "section": "s5.1",
+        "quote": "Table 2: ByteNet [18] 23.75 BLEU, but no training FLOPs are listed for ByteNet."
+      }
+    ],
+    "key_facts": ["no FLOPs listed for ByteNet", "Table 2 has no training cost entry for ByteNet"],
+    "must_refuse": false,
+    "expected_answer": "In Table 2 of Attention Is All You Need, no training cost in FLOPs is listed for ByteNet (the cell is blank or omitted, unlike GNMT or ConvS2S).",
+    "notes": "Trap: Naive retrievers often grab GNMT (2.3 * 10^19) or Transformer FLOPs (3.3 * 10^18) instead of noting ByteNet lacks FLOPs."
+  },
+  {
+    "question_id": "q14",
+    "question": "Does Moshi use Byte-Pair Encoding (BPE) for compressing and tokenizing its continuous speech audio signals?",
+    "category": "trap_distractor",
+    "target_papers": ["moshi"],
+    "gold_passages": [
+      {
+        "short_tag": "moshi",
+        "page": 8,
+        "section": "s3.3",
+        "quote": "We use Split Residual Vector Quantization (Split-RVQ) in Mimi... rather than standard text subword tokenization."
+      }
+    ],
+    "key_facts": ["does not use BPE for audio", "uses Split-RVQ (Residual Vector Quantization)", "Mimi neural audio codec"],
+    "must_refuse": false,
+    "expected_answer": "No. Moshi uses the Mimi neural audio codec with Split Residual Vector Quantization (Split-RVQ) to tokenize audio, not Byte-Pair Encoding (BPE).",
+    "notes": "Trap: Questions mentioning tokenization often trigger BPE text references instead of audio RVQ."
+  },
+  {
+    "question_id": "q15",
+    "question": "What chunk size in milliseconds does the Transformer encoder in Attention Is All You Need use to split input sentences?",
+    "category": "trap_multi_paper",
+    "target_papers": ["attention", "dynamic_chunking"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 2,
+        "section": "s1",
+        "quote": "The Transformer processes the full sequence at once without millisecond chunking."
+      }
+    ],
+    "key_facts": ["Attention Is All You Need does not use chunk size in milliseconds", "processes entire sequence via self-attention", "chunking is introduced in H-Net"],
+    "must_refuse": false,
+    "expected_answer": "The Transformer in Attention Is All You Need does not use millisecond chunking; it attends across all input token positions simultaneously. Chunking concepts belong to H-Net.",
+    "notes": "Trap: Conflates Transformer sequence processing with audio/dynamic chunking."
+  },
+  {
+    "question_id": "q16",
+    "question": "Compare the sequence processing philosophies between Attention Is All You Need and H-Net (Dynamic Chunking): how do they handle input granularity?",
+    "category": "trap_multi_paper",
+    "target_papers": ["attention", "dynamic_chunking"],
+    "gold_passages": [
+      {
+        "short_tag": "attention",
+        "page": 5,
+        "section": "s3.4",
+        "quote": "We use learned embeddings... with byte-pair encoding or wordpiece tokens."
+      },
+      {
+        "short_tag": "dynamic_chunking",
+        "page": 1,
+        "section": "sabstract",
+        "quote": "replaces the tokenization-LM-detokenization pipeline with an end-to-end byte-level hierarchical sequence model."
+      }
+    ],
+    "key_facts": [
+      "Attention relies on fixed subword tokens (e.g. BPE/wordpiece)",
+      "H-Net is tokenizer-free operating directly on raw bytes with learned dynamic boundaries"
+    ],
+    "must_refuse": false,
+    "expected_answer": "Attention Is All You Need operates on pre-segmented subword tokens (BPE), whereas H-Net is completely tokenizer-free, learning dynamic multi-stage chunks directly from raw byte sequences.",
+    "notes": "Multi-paper comparison guard test. Both papers must be retrieved in top-k."
+  }
+]
+

@@ -1,0 +1,30 @@
+# Environment variables and secrets (Rule 3)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Pytest / Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases & logs
+*.db
+*.sqlite3
+events.jsonl
+results.csv
+
+# Data directories (raw downloads, extracted pages)
+data/raw/*.pdf
+data/extracted/
+
