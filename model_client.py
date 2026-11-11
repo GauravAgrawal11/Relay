@@ -63,6 +63,7 @@ class ModelResponse:
     status: str = "ok"  # 'ok', 'rate_limited', 'timeout', 'error'
     error_message: Optional[str] = None
     source: str = "real"  # 'real' or 'stand-in'
+    retries: int = 0
 
 
 class BaseModelClient(ABC):
@@ -288,16 +289,17 @@ class StandinClient(BaseModelClient):
         error_msg: Optional[str] = None
 
         if self.mock_mode:
-            # Internal deterministic mock for standalone testing
-            timing.first_byte_time = timing.sent_time + 0.05
-            timing.first_token_time = timing.sent_time + 0.08
-            timing.user_first_token_time = timing.first_token_time if not validate_before_stream else timing.sent_time + 0.2
+            # Internal deterministic mock calibrated from real probes (probes/raw_probe_output.json)
+            # p50 TTFT = 2442.4 ms, p50 Total = 2877.6 ms (Issue 28)
+            timing.first_byte_time = timing.sent_time + 2.100
+            timing.first_token_time = timing.sent_time + 2.442
+            timing.user_first_token_time = timing.first_token_time if not validate_before_stream else timing.sent_time + 2.878
             simulated_text = (
-                "Based on the provided passages [attention v7 s3.2 p.4], "
+                "Based on the provided passages [attention v7 s3.2.2 p.4], "
                 "the scaled dot-product attention scales the dot product by 1/sqrt(d_k)."
             )
             collected_tokens.append(simulated_text)
-            timing.done_time = timing.sent_time + 0.22
+            timing.done_time = timing.sent_time + 2.878
             usage.prompt_tokens = sum(len(m.get("content", "").split()) for m in messages)
             usage.completion_tokens = len(simulated_text.split())
             usage.total_tokens = usage.prompt_tokens + usage.completion_tokens

@@ -55,6 +55,7 @@ class PipelineResult:
     retrieved_passages: List[Passage]
     citations_valid: bool
     answer_grade: str
+    retries: int = 0
 
 
 class RelayPipeline:
@@ -169,10 +170,10 @@ class RelayPipeline:
 
         # Local refusal path: Zero Groq API calls!
         if decision == "UNRELATED":
-            refusal_ans = "This assistant covers only Attention Is All You Need, Moshi, and Dynamic Chunking."
+            refusal_ans = ev_decision.get("reason", "This assistant covers only Attention Is All You Need, Moshi, and Dynamic Chunking.")
             timing = ModelTiming(sent_time=t0, first_token_time=time.time(), done_time=time.time())
-            usage = ModelUsage(prompt_tokens=len(question.split()), completion_tokens=len(refusal_ans.split()), total_tokens=len(question.split()) + len(refusal_ans.split()))
-            grade = "refused_correctly" if (eval_question and eval_question.must_refuse) else "wrong"
+            usage = ModelUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+            grade = "refused_correctly" if (eval_question and eval_question.must_refuse) else "refused_wrongly"
 
             res = PipelineResult(
                 request_id=req_id,
@@ -185,28 +186,34 @@ class RelayPipeline:
                 timing=timing,
                 usage=usage,
                 retrieval_setting=self.retrieval_setting,
-                retrieved_passages=passages,
+                retrieved_passages=[],  # Refusals return no passages (Issue 6)
                 citations_valid=True,
                 answer_grade=grade,
             )
             self._log_final_result(res, start_time_iso)
             return res
 
-        # Query rewrite loop on weak evidence (once only)
+        # One wider top-k retry checked against user's actual question (Issue 8 & 22)
         if decision == "WEAK_PARTIAL":
-            # Attempt single rewrite by appending key terms
-            rewritten_query = f"{normalized_query} details"
-            rewritten_passages, _ = self.retriever.retrieve(rewritten_query)
-            ev2 = check_evidence(rewritten_query, rewritten_passages)
+            wider_start = time.time()
+            wider_passages, wider_info = self.retriever.retrieve(normalized_query, top_k=8)
+            wider_ms = (time.time() - wider_start) * 1000.0
+            default_event_logger.log(EventRecord(
+                request_id=req_id,
+                step="retrieval_retry",
+                start_time=wider_start,
+                end_time=time.time(),
+                duration_ms=wider_ms,
+                extra=wider_info,
+            ))
+            ev2 = check_evidence(normalized_query, wider_passages)
             if ev2["decision"] == "SUFFICIENT":
-                passages = rewritten_passages
-                normalized_query = rewritten_query
+                passages = wider_passages
             else:
-                # Still weak: return evidence-based refusal with closest excerpts
-                closest_tags = " ".join(p.tag for p in passages[:2])
-                refusal_ans = f"The provided papers don't establish this fact directly. Related passages: {closest_tags}"
+                # Still weak: return reason text only, no tags (Issue 7 & 9)
+                refusal_ans = ev2.get("reason", "The provided papers don't establish this fact directly.")
                 timing = ModelTiming(sent_time=t0, first_token_time=time.time(), done_time=time.time())
-                usage = ModelUsage(prompt_tokens=len(question.split()), completion_tokens=len(refusal_ans.split()), total_tokens=len(question.split()) + len(refusal_ans.split()))
+                usage = ModelUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
                 grade = "refused_correctly" if (eval_question and eval_question.must_refuse) else "refused_wrongly"
 
                 res = PipelineResult(
@@ -220,7 +227,7 @@ class RelayPipeline:
                     timing=timing,
                     usage=usage,
                     retrieval_setting=self.retrieval_setting,
-                    retrieved_passages=passages,
+                    retrieved_passages=[],  # Clear passages on refusal
                     citations_valid=True,
                     answer_grade=grade,
                 )
@@ -243,12 +250,26 @@ class RelayPipeline:
         # ==========================================
         answer = model_resp.content
         citations_valid = True
-        if model_resp.status == "ok":
+        output_passages = passages
+
+        # Fallback when daily budget is exhausted: 3pm retrieval-only reply (Issue 31)
+        if model_resp.status == "rate_limited" and "Daily" in (model_resp.error_message or ""):
+            excerpts = "\n\n".join(
+                f"Passage {idx+1} {p.tag}:\n\"{p.text[:220]}...\""
+                for idx, p in enumerate(passages[:3])
+            )
+            answer = f"Notice: Daily LLM API quota has been reached. Serving verified source excerpts directly:\n\n{excerpts}"
+            model_resp.content = answer
+            model_resp.status = "ok"
+            citations_valid = True
+            output_passages = passages[:3]
+        elif model_resp.status == "ok":
             valid, cite_errors = validate_citations(answer, passages)
             citations_valid = valid
             if not valid:
-                # Fallback on invalid citation: replace with safe refusal
+                # Fallback on invalid citation: replace with safe refusal and clear passages (Issue 21)
                 answer = "The retrieved passages do not provide verifiable evidence to support this claim."
+                output_passages = []
 
         # Compute grade
         if eval_question:
@@ -266,6 +287,19 @@ class RelayPipeline:
             else:
                 grade = "wrong"
 
+        # End-to-end pipeline timing
+        t_done = time.time()
+        first_tok_time = getattr(model_resp.timing, "first_token_time", 0.0)
+        done_time = max(t_done, getattr(model_resp.timing, "done_time", t_done))
+        if first_tok_time > done_time:
+            done_time = first_tok_time + 0.001
+        pipeline_timing = ModelTiming(
+            sent_time=t0,
+            first_token_time=first_tok_time if first_tok_time > t0 else 0.0,
+            user_first_token_time=getattr(model_resp.timing, "user_first_token_time", 0.0),
+            done_time=done_time,
+        )
+
         res = PipelineResult(
             request_id=req_id,
             scenario=scenario,
@@ -274,12 +308,13 @@ class RelayPipeline:
             normalized_query=normalized_query,
             answer=answer,
             status=model_resp.status,
-            timing=model_resp.timing,
+            timing=pipeline_timing,
             usage=model_resp.usage,
             retrieval_setting=self.retrieval_setting,
-            retrieved_passages=passages,
+            retrieved_passages=output_passages,
             citations_valid=citations_valid,
             answer_grade=grade,
+            retries=getattr(model_resp, "retries", 0),
         )
 
         self._log_final_result(res, start_time_iso)
@@ -292,10 +327,10 @@ class RelayPipeline:
             scenario=res.scenario,
             source=res.source,
             start_time=start_time_iso,
-            first_token_ms=res.timing.first_token_ms,
+            first_token_ms=res.timing.first_token_ms if res.status == "ok" else 0.0,
             total_ms=res.timing.total_ms,
             status=res.status,
-            retries=0,
+            retries=res.retries,
             tokens_in=res.usage.prompt_tokens,
             tokens_out=res.usage.completion_tokens,
             retrieval_setting=res.retrieval_setting,

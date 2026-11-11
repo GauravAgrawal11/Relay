@@ -23,34 +23,25 @@ def simple_tokenize(text: str) -> List[str]:
 
 def detect_named_papers(query: str) -> List[str]:
     """
-    Identify target papers referenced in a user question.
-    Returns list of short_tags, e.g. ['attention', 'moshi'].
+    Identify target papers explicitly named in a user question.
+    Requires explicit paper identity rather than generic concept terms (Issue 17).
     """
     q_lower = query.lower()
     named: List[str] = []
 
-    # Attention aliases
-    if any(k in q_lower for k in ["attention is all you need", "vaswani", "transformer"]):
-        named.append("attention")
-    elif "attention" in q_lower and "moshi" in q_lower:
+    # Attention paper explicit references
+    if any(k in q_lower for k in ["attention is all you need", "vaswani", "1706.03762"]):
         named.append("attention")
 
-    # Moshi aliases
-    if any(k in q_lower for k in ["moshi", "mimi", "helium", "kyutai"]):
+    # Moshi paper explicit references
+    if any(k in q_lower for k in ["moshi", "mimi", "kyutai", "2410.00037"]):
         named.append("moshi")
 
-    # Dynamic Chunking / H-Net aliases
-    if any(k in q_lower for k in ["dynamic chunking", "h-net", "hnet", "hwang", "tokenizer-free"]):
-        named.append("dynamic_chunking")
-    elif "chunking" in q_lower and not ("attention" in q_lower and "moshi" in q_lower and len(named) == 2):
+    # Dynamic Chunking explicit references
+    if any(k in q_lower for k in ["dynamic chunking", "h-net", "hnet", "hwang", "2507.07955"]):
         named.append("dynamic_chunking")
 
-    # Remove duplicates preserving order
-    result: List[str] = []
-    for tag in named:
-        if tag not in result:
-            result.append(tag)
-    return result
+    return named
 
 
 class BM25Searcher:
@@ -64,10 +55,16 @@ class BM25Searcher:
     def search(self, query: str, top_k: int) -> List[Tuple[Passage, float]]:
         query_tokens = simple_tokenize(query)
         if not query_tokens:
-            return [(p, 0.0) for p in self.passages[:top_k]]
+            return []
         scores = self.bm25.get_scores(query_tokens)
-        top_indices = np.argsort(scores)[::-1][:top_k]
-        return [(self.passages[idx], float(scores[idx])) for idx in top_indices]
+        # Drop zero-score hits to prevent arbitrary passage pollution in RRF (Issue 16)
+        scored_pairs = [
+            (self.passages[idx], float(scores[idx]))
+            for idx in range(len(scores))
+            if scores[idx] > 0.0
+        ]
+        scored_pairs.sort(key=lambda x: x[1], reverse=True)
+        return scored_pairs[:top_k]
 
 
 class VectorSearcher:

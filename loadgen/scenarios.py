@@ -25,11 +25,11 @@ async def run_steady_scenario(
     questions: List[EvalQuestion],
     source: str = "stand-in",
     retrieval_setting: str = "setting_b",
-    count: int = 6,
+    count: int = 16,
 ) -> List[Any]:
-    """Steady scenario: requests spaced at regular, compliant intervals."""
-    print("\n--- Running Scenario 1: STEADY ---")
-    gate = TrafficGate(LimiterConfig(requests_per_minute=1000, tokens_per_minute=8000))
+    """Steady scenario: requests spaced at regular intervals."""
+    print("\n--- Running Scenario 1: STEADY (16 requests) ---")
+    gate = TrafficGate(LimiterConfig(requests_per_minute=1000, tokens_per_minute=8000, in_flight_cap=4))
     pipe = RelayPipeline(source=source, retrieval_setting=retrieval_setting, gate=gate)
     results = []
 
@@ -42,7 +42,7 @@ async def run_steady_scenario(
             eval_question=q,
         )
         results.append(res)
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.1)
 
     return results
 
@@ -51,11 +51,11 @@ async def run_burst_scenario(
     questions: List[EvalQuestion],
     source: str = "stand-in",
     retrieval_setting: str = "setting_b",
-    burst_size: int = 8,
+    burst_size: int = 16,
 ) -> List[Any]:
     """Burst scenario: sudden flood of simultaneous requests."""
-    print("\n--- Running Scenario 2: BURST ---")
-    gate = TrafficGate(LimiterConfig(in_flight_cap=4, max_queue_depth=15))
+    print("\n--- Running Scenario 2: BURST (16 requests) ---")
+    gate = TrafficGate(LimiterConfig(in_flight_cap=4, max_queue_depth=8, default_timeout_seconds=5.0))
     pipe = RelayPipeline(source=source, retrieval_setting=retrieval_setting, gate=gate)
 
     tasks = [
@@ -75,11 +75,11 @@ async def run_sustained_overload_scenario(
     questions: List[EvalQuestion],
     source: str = "stand-in",
     retrieval_setting: str = "setting_b",
-    total_requests: int = 12,
+    total_requests: int = 20,
 ) -> List[Any]:
-    """Sustained overload: high rate that exercises bounded queue and backoff."""
-    print("\n--- Running Scenario 3: SUSTAINED OVERLOAD ---")
-    gate = TrafficGate(LimiterConfig(in_flight_cap=3, max_queue_depth=5, default_timeout_seconds=10.0))
+    """Sustained overload: high concurrency that overflows bounded queue."""
+    print("\n--- Running Scenario 3: SUSTAINED OVERLOAD (20 requests) ---")
+    gate = TrafficGate(LimiterConfig(in_flight_cap=3, max_queue_depth=6, default_timeout_seconds=4.0))
     pipe = RelayPipeline(source=source, retrieval_setting=retrieval_setting, gate=gate)
 
     tasks = [
@@ -99,11 +99,11 @@ async def run_limit_halved_scenario(
     questions: List[EvalQuestion],
     source: str = "stand-in",
     retrieval_setting: str = "setting_b",
-    count: int = 6,
+    count: int = 12,
 ) -> List[Any]:
     """Limit halved scenario: simulated 50% degraded upstream TPM/RPM limits."""
-    print("\n--- Running Scenario 4: PER-MINUTE LIMIT HALVED ---")
-    halved_gate = TrafficGate(LimiterConfig(requests_per_minute=500, tokens_per_minute=4000))
+    print("\n--- Running Scenario 4: PER-MINUTE LIMIT HALVED (12 requests) ---")
+    halved_gate = TrafficGate(LimiterConfig(requests_per_minute=500, tokens_per_minute=4000, in_flight_cap=2, max_queue_depth=4))
     pipe = RelayPipeline(source=source, retrieval_setting=retrieval_setting, gate=halved_gate)
     results = []
 
@@ -116,7 +116,7 @@ async def run_limit_halved_scenario(
             eval_question=q,
         )
         results.append(res)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.05)
 
     return results
 
@@ -125,10 +125,10 @@ async def run_daily_budget_exhausted_scenario(
     questions: List[EvalQuestion],
     source: str = "stand-in",
     retrieval_setting: str = "setting_b",
-    count: int = 4,
+    count: int = 6,
 ) -> List[Any]:
-    """Daily budget exhausted scenario: zero quota remaining, immediate refusal."""
-    print("\n--- Running Scenario 5: DAILY BUDGET EXHAUSTED ---")
+    """Daily budget exhausted scenario: zero quota remaining -> retrieval-only fallback."""
+    print("\n--- Running Scenario 5: DAILY BUDGET EXHAUSTED (6 requests) ---")
     exhausted_gate = TrafficGate(LimiterConfig(daily_requests_budget=0))
     pipe = RelayPipeline(source=source, retrieval_setting=retrieval_setting, gate=exhausted_gate)
     results = []

@@ -15,8 +15,9 @@ def is_refusal_answer(answer: str) -> bool:
     ans_lower = answer.lower()
     refusal_keywords = [
         "refuse", "cannot answer", "does not contain", "do not mention",
-        "not covered", "don't establish", "outside the scope", "does not discuss",
-        "only covers", "not available in the provided", "papers do not say",
+        "not covered", "don't establish", "do not establish", "does not establish",
+        "outside the scope", "does not discuss", "only covers",
+        "not available in the provided", "papers do not say", "papers do not establish",
     ]
     return any(kw in ans_lower for kw in refusal_keywords)
 

@@ -69,7 +69,7 @@ def test_comparison_guard_promotion():
 
     # All top-3 are attention, but question mentions Moshi as well
     ranked = [p_att1, p_att2, p_att3, p_moshi]
-    query = "Compare the Transformer in Attention with Moshi audio model"
+    query = "Compare the Transformer in Attention Is All You Need with Moshi audio model"
 
     guarded, triggered = apply_comparison_guard(ranked, query, top_k=3)
     assert triggered is True

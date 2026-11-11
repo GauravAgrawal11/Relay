@@ -196,6 +196,7 @@ class TrafficGate:
                         # Record actual usage and reconcile
                         async with self._lock:
                             self.record_usage(resp.usage.total_tokens)
+                        resp.retries = retries
                         return resp
 
                     if resp.status == "rate_limited" and retries < self.config.max_retries:
@@ -233,6 +234,7 @@ class TrafficGate:
                         continue
 
                     # Unrecoverable error or retries exhausted
+                    resp.retries = retries
                     return resp
 
         finally:

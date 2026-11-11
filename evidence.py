@@ -1,5 +1,5 @@
 """
-evidence.py: Zone 1 preprocessing, entity spell-checking, and lexical evidence verification.
+evidence.py: Zone 1 preprocessing, entity spell-checking, scope, and lexical evidence verification.
 Validates input clarity, performs vocabulary-constrained spell correction (protecting domain terms
 like Moshi, Mimi, and H-Net), and checks whether retrieved passages contain sufficient factual
 grounding before invoking the LLM gate. Also validates citation tags in Zone 3.
@@ -14,11 +14,11 @@ from config import TARGET_PAPERS
 
 # Protected terminology that must never be altered by spell correction
 PROTECTED_TERMS = {
-    "attention", "transformer", "vaswani", "shazeer",
+    "attention", "transformer", "transformers", "vaswani", "shazeer",
     "moshi", "mimi", "helium", "kyutai",
     "hnet", "h-net", "hwang", "chunking", "dechunking",
     "rvq", "bleu", "bpe", "flops", "downsampler", "upsampler",
-    "tokenizer", "subword", "multihead", "softmax",
+    "tokenizer", "subword", "multihead", "softmax", "encoder", "decoder",
 }
 
 # Common English stopwords to ignore during lexical overlap calculation
@@ -29,7 +29,8 @@ STOPWORDS = {
     "have", "has", "had", "do", "does", "did", "and", "but", "if", "or", "because",
     "as", "until", "while", "of", "what", "which", "who", "whom", "this", "that",
     "these", "those", "how", "why", "when", "where", "can", "could", "should",
-    "would", "does", "did", "paper", "papers", "model", "models",
+    "would", "does", "did", "paper", "papers", "model", "models", "tell", "explain",
+    "describe", "define", "give", "show", "used", "using",
 }
 
 
@@ -45,50 +46,91 @@ def build_paper_vocabulary() -> Set[str]:
 PAPER_VOCABULARY = build_paper_vocabulary()
 
 
+def tokenize_words_with_contractions(text: str) -> List[str]:
+    """Hyphen and apostrophe aware tokenizer: preserves 'Moshi\'s' and 'H-Net'."""
+    return re.findall(r"\b[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*(?:'[a-zA-Z0-9]+)?\b|[^\w\s]", text)
+
+
 def spell_fix_query(query: str) -> Tuple[str, bool]:
     """
     Spell-fix user queries using difflib against domain vocabulary.
-    Preserves protected domain terms and returns (fixed_query, was_modified).
+    Preserves protected domain terms and apostrophes without mangling (e.g. Moshi's stays Moshi's).
     """
-    words = re.findall(r"\b[\w\-]+\b|[^\w\s]", query)
+    tokens = tokenize_words_with_contractions(query)
     modified = False
-    fixed_words = []
+    fixed_tokens = []
 
-    for w in words:
-        w_lower = w.lower()
-        if w_lower in PROTECTED_TERMS or len(w) < 4 or not w.isalpha():
-            fixed_words.append(w)
+    for tok in tokens:
+        tok_lower = tok.lower()
+        # Preserve punctuation or contractions
+        if not re.match(r"^[a-zA-Z0-9\-']+$", tok):
+            fixed_tokens.append(tok)
             continue
 
-        # Look for close match in paper vocabulary if not a standard English word
-        matches = difflib.get_close_matches(w_lower, list(PAPER_VOCABULARY), n=1, cutoff=0.82)
-        if matches and matches[0] != w_lower:
-            fixed_words.append(matches[0])
+        base_word = tok_lower.split("'")[0]
+        if base_word in PROTECTED_TERMS or len(base_word) < 4 or not base_word.replace("-", "").isalpha():
+            fixed_tokens.append(tok)
+            continue
+
+        # Look for close match in paper vocabulary
+        matches = difflib.get_close_matches(base_word, list(PAPER_VOCABULARY), n=1, cutoff=0.82)
+        if matches and matches[0] != base_word:
+            apostrophe_part = tok.split("'")[1] if "'" in tok else ""
+            suffix = f"'{apostrophe_part}" if apostrophe_part else ""
+            fixed_tokens.append(matches[0] + suffix)
             modified = True
         else:
-            fixed_words.append(w)
+            fixed_tokens.append(tok)
 
-    fixed_query = " ".join(fixed_words)
-    # Clean spacing around punctuation
+    # Re-assemble preserving apostrophes without extra spaces
+    fixed_query = " ".join(fixed_tokens)
     fixed_query = re.sub(r"\s+([?.!,])", r"\1", fixed_query)
+    fixed_query = re.sub(r"\s+'\s*", "'", fixed_query)
     return fixed_query, modified
 
 
 def check_clarity(query: str) -> str:
     """
     Classify query clarity: 'CLEAR', 'AMBIGUOUS', or 'INCOMPLETE'.
-    Rule-based to ensure conservative single-turn handling.
+    Only treats a question as incomplete when it has no domain content terms.
+    Short prompts like 'Define BLEU' or 'Explain Mimi' are CLEAR because they name corpus terms.
     """
     q_strip = query.strip()
-    words = q_strip.split()
-    if len(words) < 3 and not any(p in q_strip.lower() for p in ["attention", "moshi", "h-net"]):
+    words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\-]+\b", q_strip)]
+    content_words = [w for w in words if w not in STOPWORDS]
+
+    # If completely empty or no content words at all
+    if not content_words:
         return "INCOMPLETE"
 
-    # Pronoun checks without referent
-    if words[0].lower() in ["it", "they", "he", "she"] and len(words) < 5:
+    # Pronoun checks without clear referent
+    if words and words[0] in ["it", "they", "he", "she"] and len(words) < 5:
         return "AMBIGUOUS"
 
+    # If very short (1-2 words), ensure at least one content term is in paper vocabulary
+    if len(words) <= 2:
+        has_corpus_term = any(w in PAPER_VOCABULARY or w in PROTECTED_TERMS for w in content_words)
+        if not has_corpus_term:
+            return "INCOMPLETE"
+
     return "CLEAR"
+
+
+def check_scope(query: str) -> bool:
+    """
+    Check if query is completely outside the library scope using corpus vocabulary.
+    Returns True if query has some domain connection; False if completely alien.
+    """
+    q_tokens = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\-]{3,}\b", query) if w.lower() not in STOPWORDS]
+    if not q_tokens:
+        return True  # Let downstream handle empty content terms
+
+    # Check how many query tokens overlap with the paper vocabulary
+    overlap = sum(1 for t in q_tokens if t in PAPER_VOCABULARY or t in PROTECTED_TERMS)
+    # If the user asks a multi-word question and has 0 overlap with the entire domain vocabulary
+    if len(q_tokens) >= 3 and overlap == 0:
+        return False
+    return True
 
 
 def check_evidence(
@@ -98,33 +140,29 @@ def check_evidence(
 ) -> Dict[str, Any]:
     """
     Verify whether retrieved passages provide sufficient evidence to answer the query.
-    Note: Threshold 0.20 is derived from eval/questions.json (overfitting caveat noted).
-
-    Returns decision:
-      - 'SUFFICIENT': Proceed to generation.
-      - 'WEAK_PARTIAL': Overlap exists but insufficient; refuse with closest passages.
-      - 'UNRELATED': Zero overlap; refuse with scope boundary message.
+    No hardcoded topic blocklists: uses lexical overlap and IDF-weighted coverage.
     """
-    q_tokens = [w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", query) if w.lower() not in STOPWORDS]
+    q_tokens = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\-]{3,}\b", query) if w.lower() not in STOPWORDS]
     if not q_tokens:
-        return {"decision": "SUFFICIENT", "overlap_ratio": 1.0, "reason": "Generic query"}
+        return {
+            "decision": "WEAK_PARTIAL",
+            "overlap_ratio": 0.0,
+            "matched_tokens": [],
+            "reason": "The question contains no specific technical keywords from the papers.",
+        }
+
+    # First check scope from corpus vocabulary
+    if not check_scope(query):
+        return {
+            "decision": "UNRELATED",
+            "overlap_ratio": 0.0,
+            "matched_tokens": [],
+            "reason": "This assistant covers only Attention Is All You Need, Moshi, and Dynamic Chunking.",
+        }
 
     combined_text = " ".join(p.text.lower() for p in retrieved_passages)
-
-    # Calculate token overlap
     matched_tokens = [t for t in q_tokens if t in combined_text]
-    overlap_ratio = len(matched_tokens) / len(q_tokens)
-
-    # Check for completely unrelated topic (e.g. Apple Vision Pro, GPT-4, LLaMA)
-    unrelated_indicators = ["vision pro", "gpt-4", "llama", "battery", "apple", "swedish"]
-    if any(ind in query.lower() for ind in unrelated_indicators):
-        if overlap_ratio < 0.15:
-            return {
-                "decision": "UNRELATED",
-                "overlap_ratio": round(overlap_ratio, 2),
-                "matched_tokens": matched_tokens,
-                "reason": "This assistant covers only Attention Is All You Need, Moshi, and Dynamic Chunking.",
-            }
+    overlap_ratio = len(matched_tokens) / len(q_tokens) if q_tokens else 0.0
 
     if overlap_ratio >= min_overlap_threshold:
         return {
@@ -138,7 +176,7 @@ def check_evidence(
             "decision": "WEAK_PARTIAL",
             "overlap_ratio": round(overlap_ratio, 2),
             "matched_tokens": matched_tokens,
-            "reason": "The papers don't establish this fact directly.",
+            "reason": "The provided papers don't establish this fact directly.",
         }
     else:
         return {
@@ -151,29 +189,33 @@ def check_evidence(
 
 def validate_citations(answer: str, retrieved_passages: List[Passage]) -> Tuple[bool, List[str]]:
     """
-    Validate that all citation tags in the answer exist in the retrieved passages.
-    Tag format: [paper_tag version (section)? p.page]
+    Validate citation tags. Requires exact tag match against retrieved passages.
+    Recognizes Unicode lenticular brackets 【...】 and model's own refusal phrasing.
     """
+    normalized_answer = answer.replace("【", "[").replace("】", "]")
     tag_pattern = re.compile(r"\[([a-z_]+)\s+(v\d+)(?:\s+(s[\w\.]+))?\s+p\.(\d+)\]", re.IGNORECASE)
-    matches = tag_pattern.findall(answer)
+    matches = tag_pattern.findall(normalized_answer)
+
+    # Check if answer is a recognized refusal phrasing (model or template)
+    refusal_markers = [
+        "refuse", "not mention", "does not contain", "cannot answer",
+        "do not establish", "don't establish", "papers do not say",
+        "not covered in the provided", "not establish this",
+        "only covers", "do not provide verifiable evidence",
+    ]
+    if any(marker in answer.lower() for marker in refusal_markers):
+        return True, []
 
     if not matches:
-        # Check if the answer is a refusal
-        if any(w in answer.lower() for w in ["refuse", "not mention", "does not contain", "cannot answer"]):
-            return True, []
         return False, ["Answer contains no citation tags and is not a refusal."]
 
     valid_passage_tags = {p.tag.lower() for p in retrieved_passages}
-    # Also index by paper and page for flexible tag matching
-    valid_pages = {(p.short_tag.lower(), p.page) for p in retrieved_passages}
-
     errors = []
     for m in matches:
         short_tag, version, section, page_str = m[0].lower(), m[1].lower(), m[2], int(m[3])
-        # Construct candidate tag
         tag_str = f"[{short_tag} {version} {section} p.{page_str}]" if section else f"[{short_tag} {version} p.{page_str}]"
-        if tag_str.lower() not in valid_passage_tags and (short_tag, page_str) not in valid_pages:
+        # Strict exact tag check
+        if tag_str.lower() not in valid_passage_tags:
             errors.append(f"Cited tag {tag_str} was not found in retrieved passages.")
 
     return (len(errors) == 0), errors
-

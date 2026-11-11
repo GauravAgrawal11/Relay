@@ -173,8 +173,11 @@ class ResultsLogger:
     def log_result(self, record: ResultRecord) -> None:
         row_dict = record.to_dict()
         with self._lock:
+            needs_header = not self.csv_path.exists() or self.csv_path.stat().st_size == 0
             with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=RESULTS_CSV_COLUMNS)
+                if needs_header:
+                    writer.writeheader()
                 writer.writerow(row_dict)
 
     def read_results(self) -> List[Dict[str, str]]:
