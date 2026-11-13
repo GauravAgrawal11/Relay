@@ -121,3 +121,4 @@ def test_invalid_or_mismatched_citation():
     assert valid is False
     assert len(errors) > 0
     assert "was not found in retrieved passages" in errors[0]
+
