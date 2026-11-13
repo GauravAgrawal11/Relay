@@ -74,7 +74,11 @@ CSS_PAGE1 = """
 
 HTML_PAGE_1 = CSS_PAGE1 + """
 <h1>THE RELAY: PRODUCTION-GATED RAG PIPELINE REPORT</h1>
-<div class="subtitle">Auditable, Zero-Framework Relay over arXiv Papers (1706.03762v7, 2410.00037v1, 2507.07955v2) | Groq Free Tier (bom / openai/gpt-oss-120b)</div>
+<div class="subtitle">
+  Auditable, Zero-Framework Relay over arXiv Papers (1706.03762v7, 2410.00037v1, 2507.07955v2) | Groq Free Tier (bom / openai/gpt-oss-120b)<br>
+  <b>GitHub:</b> <a href="https://github.com/GauravAgrawal11/Relay">https://github.com/GauravAgrawal11/Relay</a> &nbsp;|&nbsp; 
+  <b>Chat History:</b> <a href="https://claude.ai/share/e1a3182f-4589-4971-ba55-0cb3b6a65237">https://claude.ai/share/e1a3182f-4589-4971-ba55-0cb3b6a65237</a>
+</div>
 
 <h2>1. What I Built and Why</h2>
 <p>
@@ -480,7 +484,10 @@ Visiting <a href="https://www.vaani.dev/">https://www.vaani.dev/</a> (Vaani Voic
 <b>One Decision Where I Overruled It:</b> The assistant initially suggested importing LangChain's rate limiter and an external SQLite caching wrapper. I overruled it, strictly adhering to the assignment's Hard Rule 5 to build a transparent 80-line FIFO sliding-window gate and in-memory TTL dictionary that can be defended in a live coding interview in two sentences.
 </p>
 <p>
-<b>What Is Distinctly Mine:</b> The mathematical reconciliation of end-to-end pipeline latency in <code>analysis/tables.py</code>, the dual-token sliding-window admission controller, the supporting citation isolation logic, and the entity-presence pre-gate verification rules derived from manual evaluation of the three arXiv papers.
+<b>What Is Distinctly Mine:</b> The mathematical reconciliation of end-to-end pipeline latency in <code>analysis/tables.py</code>, the dual-token sliding-window admission controller, the supporting citation isolation logic, and the entity-presence pre-gate verification rules derived from manual evaluation of the three arXiv papers.<br>
+<b>Live Public Artifacts:</b><br>
+• <b>GitHub Repository:</b> <a href="https://github.com/GauravAgrawal11/Relay">https://github.com/GauravAgrawal11/Relay</a><br>
+• <b>Full Uncleaned Assistant Conversation:</b> <a href="https://claude.ai/share/e1a3182f-4589-4971-ba55-0cb3b6a65237">https://claude.ai/share/e1a3182f-4589-4971-ba55-0cb3b6a65237</a>
 </p>
 """
 
