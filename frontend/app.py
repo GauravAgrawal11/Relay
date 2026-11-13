@@ -16,13 +16,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+import os
 from conversation import ConversationalRelay
 from pipeline import RelayPipeline
 
 app = FastAPI(title="The Relay - ChatGPT UI", version="1.0.0")
 
-# Default pipeline and conversational wrapper
-pipeline = RelayPipeline(source="stand-in", retrieval_setting="setting_b")
+# Auto-detect real Groq API key or allow override via RELAY_SOURCE
+default_source = os.getenv("RELAY_SOURCE", "real" if os.getenv("GROQ_API_KEY") else "stand-in")
+pipeline = RelayPipeline(source=default_source, retrieval_setting="setting_b")
 chat_relay = ConversationalRelay(pipeline=pipeline, cache_enabled=True)
 
 

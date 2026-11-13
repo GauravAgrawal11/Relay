@@ -44,8 +44,10 @@ def test_section_detection():
     assert sec_id == "s3.2.1"
     assert sec_title == "Scaled Dot-Product Attention"
 
+    # Unnumbered sections like Abstract return None so citation falls back to clean page-only tag (e.g. [paper v1 p.3])
     sec_id2, sec_title2 = detect_section_in_block("Abstract\nWe present...")
-    assert sec_id2 == "sabstract"
+    assert sec_id2 is None
+    assert sec_title2 == "Abstract"
 
     sec_id3, sec_title3 = detect_section_in_block("1 Introduction\nIn recent years...")
     assert sec_id3 == "s1"

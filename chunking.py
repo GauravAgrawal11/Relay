@@ -97,24 +97,49 @@ def detect_section_in_block(
     first_line = lines[0]
 
     # Pattern 1: Numbered heading on same line, e.g. '3.2.1 Scaled Dot-Product Attention'
-    m_num_title = re.match(r"^((?:\d+\.)*\d+)\s+([A-Z][A-Za-z0-9\s\-:,/]{2,60})$", first_line)
+    # Must be standard integer section numbers (1, 3.2, 3.2.1), each part <= 20
+    m_num_title = re.match(r"^([1-9]\d*(?:\.[1-9]\d*)*)\s+([A-Z][A-Za-z0-9\s\-:,/]{2,60})$", first_line)
     if m_num_title:
         sec_num, sec_title = m_num_title.group(1), m_num_title.group(2).strip()
+        parts = [int(p) for p in sec_num.split(".")]
+        # Genuine academic sections don't have parts > 25 (e.g. 2.80 is a metric, not a section)
+        if any(p > 25 for p in parts):
+            return None, None
+        # Reject table rows or model names with parens or arithmetic
+        if any(ch in sec_title for ch in ["(", ")", "=", "+", "↓", "↑", "±", "×"]):
+            return None, None
         # Filter out common metric units accidentally matching (e.g. '12.5 Hz', '100 ms')
-        if not any(unit in sec_title.lower() for unit in ["hz", "ms", "flops", "percent", "tokens"]):
+        if not any(unit in sec_title.lower() for unit in ["hz", "ms", "flops", "percent", "tokens", "acc", "val"]):
             return f"s{sec_num}", sec_title
 
-    # Pattern 2: Dotted section number on line 1, title on line 2 (e.g. '3.2.1' then 'Scaled Dot-Product Attention')
-    if re.match(r"^(\d+\.\d+(?:\.\d+)*)$", first_line):
+    # Pattern 2: Dotted section number on line 1, title on line 2
+    # Must have a legitimate capitalized title on line 2 or next block preview
+    if re.match(r"^([1-9]\d*(?:\.[1-9]\d*)+)$", first_line):
         sec_num = first_line
-        title = ""
-        if len(lines) > 1 and len(lines[1]) < 60 and lines[1][0].isupper():
-            title = lines[1]
-        elif next_block_preview and len(next_block_preview) < 60 and next_block_preview[0].isupper():
-            title = next_block_preview
-        return f"s{sec_num}", title
+        parts = [int(p) for p in sec_num.split(".")]
+        if any(p > 25 for p in parts):
+            return None, None
 
-    # Pattern 3: Standard unnumbered academic sections
+        def _is_valid_section_title(t: str) -> bool:
+            if not (3 <= len(t) < 60 and t[0].isupper()):
+                return False
+            # Reject math, table formulas, models with parens
+            if any(ch in t for ch in ["(", ")", "=", "+", "↓", "↑", "±", "×"]):
+                return False
+            if re.match(r"^[\d\.\s%x\(\)\-\+]+$", t):
+                return False
+            if any(w in t.lower() for w in ["hz", "ms", "flops", "percent", "tokens", "acc", "val", "table"]):
+                return False
+            return True
+
+        if len(lines) > 1 and _is_valid_section_title(lines[1]):
+            return f"s{sec_num}", lines[1].strip()
+        elif next_block_preview and _is_valid_section_title(next_block_preview):
+            return f"s{sec_num}", next_block_preview.strip()
+        # If no valid title follows, this is an isolated table metric or number, NOT a heading
+        return None, None
+
+    # Pattern 3: Standard unnumbered academic sections -> return None for section id (page-only tag fallback)
     m_kw = re.match(
         r"^(Abstract|Introduction|Background|Model Architecture|Model|Evaluation|Conclusion|References|Appendix(?:\s+[A-Z])?)$",
         first_line,
@@ -122,7 +147,7 @@ def detect_section_in_block(
     )
     if m_kw:
         kw = m_kw.group(1).title()
-        return f"s{kw.lower()}", kw
+        return None, kw
 
     return None, None
 

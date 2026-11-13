@@ -166,6 +166,9 @@ class ConversationalRelay:
             scenario=scenario,
         )
 
+        # Honest UI: only supply retrieved provenance tags when citations are valid
+        retrieved_tags = [p.tag for p in result.retrieved_passages] if result.citations_valid else []
+
         response_dict = {
             "answer": result.answer,
             "status": result.status,
@@ -174,7 +177,7 @@ class ConversationalRelay:
             "timing_first_token_ms": result.timing.first_token_ms,
             "timing_total_ms": result.timing.total_ms,
             "citations_valid": result.citations_valid,
-            "retrieved_tags": [p.tag for p in result.retrieved_passages],
+            "retrieved_tags": retrieved_tags,
         }
 
         # Cache successes only
