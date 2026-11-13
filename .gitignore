@@ -24,7 +24,10 @@ htmlcov/
 events.jsonl
 results.csv
 
-# Data directories (raw downloads, extracted pages)
-data/raw/*.pdf
-data/extracted/
+# PDF reports and submission artifacts (keep local only)
+*.pdf
+CHAT_HISTORY.md
+SUBMISSION_LINKS.md
+results_archive.csv
+
 
