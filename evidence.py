@@ -187,6 +187,89 @@ def check_evidence(
         }
 
 
+def extract_cited_tags(text: str) -> List[str]:
+    """Extract normalized citation tags like '[moshi v1 s3.3.1 p.11]' from answer text."""
+    normalized = text.replace("【", "[").replace("】", "]")
+    tag_pattern = re.compile(r"\[([a-z_]+)\s+(v\d+)(?:\s+(s[\w\.]+))?\s+p\.(\d+)\]", re.IGNORECASE)
+    matches = tag_pattern.findall(normalized)
+    tags = []
+    for m in matches:
+        short_tag, version, section, page_str = m[0].lower(), m[1].lower(), m[2], int(m[3])
+        tag_str = f"[{short_tag} {version} {section} p.{page_str}]" if section else f"[{short_tag} {version} p.{page_str}]"
+        tags.append(tag_str.lower())
+    return tags
+
+
+def filter_supporting_passages(
+    answer: str,
+    retrieved_passages: List[Passage],
+) -> List[Passage]:
+    """
+    Identify which retrieved passages actually support the factual claims in the answer.
+    Separates general retrieved passages from active supporting citations.
+    A passage is considered supporting if:
+    1. It is explicitly cited in the answer text, OR
+    2. Its core numerical/entity facts directly support the sentence claims.
+    """
+    cited_tags = set(extract_cited_tags(answer))
+    supporting: List[Passage] = []
+
+    # 1. First add passages whose tags match explicit citations
+    if cited_tags:
+        for p in retrieved_passages:
+            if p.tag.lower() in cited_tags and p not in supporting:
+                supporting.append(p)
+
+    # 2. If no explicit tags or looking for strongest claim evidence, match key facts
+    if not supporting:
+        # Extract numbers and non-stopwords from answer
+        nums = set(re.findall(r"\b\d+(?:\.\d+)?\b", answer))
+        key_words = {w.lower() for w in re.findall(r"\b[a-zA-Z]{4,}\b", answer) if w.lower() not in STOPWORDS}
+
+        best_passage = None
+        best_score = 0
+        for p in retrieved_passages:
+            p_text = p.text.lower()
+            num_matches = sum(1 for n in nums if n in p_text)
+            kw_matches = sum(1 for w in key_words if w in p_text)
+            score = (num_matches * 3) + kw_matches
+            if score > best_score:
+                best_score = score
+                best_passage = p
+
+        if best_passage and best_score >= 3:
+            supporting.append(best_passage)
+
+    return supporting
+
+
+def format_pretty_citation(passage: Passage) -> str:
+    """
+    Format a clean human-readable citation label for UI presentation:
+    e.g. '[Moshi v1 · Section 3.3.1 · Page 10–11]' or '[Attention v7 · Section 3.2 · Page 4]'
+    """
+    title_map = {
+        "attention": "Attention Is All You Need",
+        "moshi": "Moshi",
+        "dynamic_chunking": "Dynamic Chunking",
+    }
+    short_map = {
+        "attention": "Attention",
+        "moshi": "Moshi",
+        "dynamic_chunking": "Dynamic Chunking",
+    }
+    paper_name = short_map.get(passage.short_tag, passage.short_tag.capitalize())
+    version_str = passage.version
+
+    sec_str = ""
+    if passage.section:
+        sec_num = passage.section.lstrip("s")
+        sec_str = f" · Section {sec_num}"
+
+    page_str = f" · Page {passage.page}"
+    return f"[{paper_name} {version_str}{sec_str}{page_str}]"
+
+
 def validate_citations(answer: str, retrieved_passages: List[Passage]) -> Tuple[bool, List[str]]:
     """
     Validate citation tags. Requires exact tag match against retrieved passages.

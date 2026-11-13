@@ -18,6 +18,8 @@ from eval_loader import EvalQuestion
 from evidence import (
     check_clarity,
     check_evidence,
+    filter_supporting_passages,
+    format_pretty_citation,
     spell_fix_query,
     validate_citations,
 )
@@ -55,6 +57,7 @@ class PipelineResult:
     retrieved_passages: List[Passage]
     citations_valid: bool
     answer_grade: str
+    supporting_passages: Optional[List[Passage]] = None
     retries: int = 0
 
 
@@ -300,6 +303,11 @@ class RelayPipeline:
             done_time=done_time,
         )
 
+        # Filter supporting passages from all retrieved passages
+        supporting = []
+        if citations_valid and output_passages:
+            supporting = filter_supporting_passages(answer, output_passages)
+
         res = PipelineResult(
             request_id=req_id,
             scenario=scenario,
@@ -314,6 +322,7 @@ class RelayPipeline:
             retrieved_passages=output_passages,
             citations_valid=citations_valid,
             answer_grade=grade,
+            supporting_passages=supporting,
             retries=getattr(model_resp, "retries", 0),
         )
 

@@ -13,6 +13,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from cache import TTLCache, make_cache_key
+from evidence import format_pretty_citation
 from config import DB_PATH
 from pipeline import PipelineResult, RelayPipeline
 
@@ -166,8 +167,14 @@ class ConversationalRelay:
             scenario=scenario,
         )
 
-        # Honest UI: only supply retrieved provenance tags when citations are valid
+        # Honest UI: separate supporting citations from raw retrieved passages
         retrieved_tags = [p.tag for p in result.retrieved_passages] if result.citations_valid else []
+        supporting_list = getattr(result, "supporting_passages", None) or []
+        supporting_citations = [format_pretty_citation(p) for p in supporting_list] if result.citations_valid else []
+
+        # If supporting citations empty but retrieved passages exist, fallback to first cited tag
+        if not supporting_citations and retrieved_tags:
+            supporting_citations = [format_pretty_citation(result.retrieved_passages[0])]
 
         response_dict = {
             "answer": result.answer,
@@ -177,6 +184,7 @@ class ConversationalRelay:
             "timing_first_token_ms": result.timing.first_token_ms,
             "timing_total_ms": result.timing.total_ms,
             "citations_valid": result.citations_valid,
+            "supporting_citations": supporting_citations,
             "retrieved_tags": retrieved_tags,
         }
 

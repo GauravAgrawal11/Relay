@@ -40,6 +40,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Relay — Academic RAG Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg-main: #212121;
@@ -51,8 +52,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             --accent: #10a37f;
             --accent-hover: #1a7f64;
             --border: #424242;
-            --tag-bg: #1c3b31;
-            --tag-text: #4ade80;
+            --tag-bg: #11271f;
+            --tag-text: #34d399;
+            --badge-bg: #064e3b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body { display: flex; height: 100vh; background-color: var(--bg-main); color: var(--text-main); overflow: hidden; }
@@ -67,6 +69,8 @@ HTML_CONTENT = """<!DOCTYPE html>
         .paper-badge { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 0.8rem; }
         .paper-badge strong { display: block; color: #fff; margin-bottom: 2px; }
         .paper-badge span { color: var(--text-muted); font-size: 0.75rem; }
+        .debug-toggle-box { margin-top: 15px; display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); }
+        .debug-toggle-box input { cursor: pointer; }
         .sidebar-footer { margin-top: auto; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 12px; }
 
         /* Main Chat Window */
@@ -80,9 +84,22 @@ HTML_CONTENT = """<!DOCTYPE html>
         .msg.assistant .avatar { background: var(--accent); }
         .avatar { width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; color: #fff; }
         .msg-body { flex: 1; font-size: 0.95rem; line-height: 1.6; }
-        .msg-body .provenance { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-        .citation-pill { background: var(--tag-bg); color: var(--tag-text); border: 1px solid #14532d; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-family: monospace; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
-        .telemetry { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+        .msg-body p { margin-bottom: 8px; }
+        .msg-body strong { font-weight: 700; color: #fff; }
+        .msg-body code { background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+        
+        /* Supporting Citation Box matching desired specification */
+        .supporting-section { margin-top: 14px; }
+        .supporting-label { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 12px; margin-bottom: 8px; }
+        .supporting-card { background: #181818; border: 1px solid #2e2e2e; border-radius: 8px; padding: 10px 14px; font-size: 0.88rem; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; gap: 8px; }
+        .supporting-card .tag-text { font-weight: 500; }
+        
+        /* Debug retrieved passages list */
+        .debug-retrieval { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+        .debug-header { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .provenance { display: flex; flex-wrap: wrap; gap: 6px; }
+        .citation-pill { background: #262626; color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; font-family: monospace; display: inline-flex; align-items: center; gap: 4px; }
+        .telemetry { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
 
         /* Input Area */
         .input-wrapper { padding: 16px 15% 24px 15%; background: var(--bg-main); }
@@ -117,6 +134,11 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="paper-badge">
             <strong>Dynamic Chunking (H-Net)</strong>
             <span>2507.07955v2 • 39 pages</span>
+        </div>
+
+        <div class="debug-toggle-box">
+            <input type="checkbox" id="debugToggle">
+            <label for="debugToggle">Debug: show retrieved candidates</label>
         </div>
 
         <div class="sidebar-footer">
@@ -200,7 +222,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
                 const data = await response.json();
                 removeLoading(loadingMsgId);
-                appendMessage('assistant', data.answer, data.retrieved_tags, data.timing_first_token_ms, data.timing_total_ms);
+                appendMessage(
+                    'assistant',
+                    data.answer,
+                    data.supporting_citations || [],
+                    data.retrieved_tags || [],
+                    data.timing_first_token_ms,
+                    data.timing_total_ms
+                );
             } catch (err) {
                 removeLoading(loadingMsgId);
                 appendMessage('assistant', 'Error communicating with The Relay pipeline: ' + err.message);
@@ -211,13 +240,49 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        function appendMessage(role, text, tags = [], ttft = null, totalMs = null) {
+        function appendMessage(role, text, supportingCitations = [], retrievedTags = [], ttft = null, totalMs = null) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `msg ${role}`;
             
-            let tagsHtml = '';
-            if (tags && tags.length > 0) {
-                tagsHtml = '<div class="provenance">' + tags.map(t => `<span class="citation-pill"><i class="fa-solid fa-bookmark"></i> ${t}</span>`).join('') + '</div>';
+            // Clean inline citation tags if they duplicate the supporting card
+            let cleanText = text;
+            if (role === 'assistant') {
+                cleanText = cleanText.replace(/\[[a-z_]+\s+v\d+(?:\s+s[\w\.]+)?\s+p\.\d+\]/gi, '').trim();
+            }
+
+            // Render Markdown using marked.js
+            let parsedBody = cleanText;
+            if (typeof marked !== 'undefined' && marked.parse) {
+                parsedBody = marked.parse(cleanText);
+            } else {
+                parsedBody = cleanText.replace(/\n/g, '<br>');
+            }
+
+            // Supporting Citation Presentation
+            let supportingHtml = '';
+            if (supportingCitations && supportingCitations.length > 0) {
+                supportingHtml = `
+                    <div class="supporting-section">
+                        <div class="supporting-label"><i class="fa-solid fa-shield-halved"></i> Supporting citation</div>
+                        <div class="supporting-card">
+                            <span class="tag-text">${supportingCitations.join(', ')}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Debug candidate retrieval display
+            const isDebug = document.getElementById('debugToggle') && document.getElementById('debugToggle').checked;
+            let debugHtml = '';
+            if (isDebug && retrievedTags && retrievedTags.length > 0) {
+                debugHtml = `
+                    <div class="debug-retrieval">
+                        <div class="debug-header"><i class="fa-solid fa-bug"></i> Debug: All ${retrievedTags.length} Retrieved Candidates</div>
+                        <div class="provenance">
+                            ${retrievedTags.map(t => `<span class="citation-pill">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
             }
 
             let telemetryHtml = '';
@@ -228,8 +293,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             msgDiv.innerHTML = `
                 <div class="avatar"><i class="fa-solid ${role === 'user' ? 'fa-user' : 'fa-robot'}"></i></div>
                 <div class="msg-body">
-                    ${text.replace(/\\n/g, '<br>')}
-                    ${tagsHtml}
+                    ${parsedBody}
+                    ${supportingHtml}
+                    ${debugHtml}
                     ${telemetryHtml}
                 </div>
             `;
