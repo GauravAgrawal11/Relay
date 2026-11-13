@@ -471,16 +471,16 @@ Visiting <a href="https://www.vaani.dev/">https://www.vaani.dev/</a> (Vaani Voic
 <b>Three Prompts That Mattered Most:</b><br>
 1. <i>"Audit arXiv v7 PDF extraction: inspect raw text blocks in Attention Is All You Need and verify section header patterns."</i> — Prompted discovering that Attention's section numbers were detached into isolated single-digit blocks, forcing custom lookahead parsing.<br>
 2. <i>"Implement an exact three-zone architecture where Zone 1 rejects out-of-scope queries in plain Python without calling Groq."</i> — Established the primary architectural bottleneck that preserved the free-tier quota.<br>
-3. <i>"Dissect the slowest request into waiting, working, and retrying so the math matches to 0.1 ms precision."</i> — Forced reconciling pipeline start timestamps with model client execution logs.
+3. <i>"Separate retrieved candidates from supporting citations, integrate marked.js for bold formatting, and test Mimi's 12.5 Hz frame rate."</i> — Prevented UI provenance clutter, displaying exact supporting citations ([Moshi v1 · Section 3.3.1 · Page 11]) while rendering clean Markdown bold text.
 </p>
 <p>
-<b>One Mistake It Made That I Caught:</b> The assistant originally used an ASCII-only regex <code>\[([a-z_]+)\s+...\]</code> for citation validation. When evaluated against live Groq output from <code>openai/gpt-oss-120b</code>, the model natively generated Unicode lenticular brackets (<code>【...】</code>), causing the validator to mark 100% of validly cited answers as citation failures and replacing them with refusals. I caught this by inspecting raw model completions in <code>events.jsonl</code> and added Unicode bracket normalization before validation.
+<b>One Mistake It Made That I Caught:</b> The assistant originally used an ASCII-only regex <code>\[([a-z_]+)\s+...\]</code> for citation validation, and later failed to separate raw retrieved candidate passages from active supporting citations in the UI (problem #21). When evaluated against live Groq output from <code>openai/gpt-oss-120b</code>, the model natively generated Unicode lenticular brackets (<code>【...】</code>), and attached 5 raw retrieved chunks alongside answers. I caught this by inspecting raw model completions in <code>events.jsonl</code> and added Unicode bracket normalization, along with <code>filter_supporting_passages()</code> to display only verified supporting citations.
 </p>
 <p>
 <b>One Decision Where I Overruled It:</b> The assistant initially suggested importing LangChain's rate limiter and an external SQLite caching wrapper. I overruled it, strictly adhering to the assignment's Hard Rule 5 to build a transparent 80-line FIFO sliding-window gate and in-memory TTL dictionary that can be defended in a live coding interview in two sentences.
 </p>
 <p>
-<b>What Is Distinctly Mine:</b> The mathematical reconciliation of end-to-end pipeline latency in <code>analysis/tables.py</code>, the dual-token sliding-window admission controller, and the entity-presence pre-gate verification rules derived from manual evaluation of the three arXiv papers.
+<b>What Is Distinctly Mine:</b> The mathematical reconciliation of end-to-end pipeline latency in <code>analysis/tables.py</code>, the dual-token sliding-window admission controller, the supporting citation isolation logic, and the entity-presence pre-gate verification rules derived from manual evaluation of the three arXiv papers.
 </p>
 """
 
